@@ -48,7 +48,7 @@ wage = []  # +
 deadline = []
 links = []  # +
 posted = []  # +
-s = Service('C:/Users/turga/chromedriver.exe')
+s = Service('C:/Users/saida/OneDrive/Desktop/Archive/chromedriver-win64/chromedriver.exe')
 driver = webdriver.Chrome(service=s)
 
 driver.get('https://staffy.az/jobs?page=1')
@@ -71,7 +71,8 @@ for p in pages:
     time.sleep(1)
     soup = bs(driver.page_source, "html.parser")
     div = soup.find('div', attrs={'class': 'MuiGrid-root MuiGrid-container MuiGrid-spacing-xs-2 MuiGrid-item'})
-    for i in div:
+    if div:
+     for i in div:
         for j in [i.text for i in i.find_all('h5')]:
             job.append(j)
         for c in [i for i in i.find_next('h6')]:
@@ -128,10 +129,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import close_all_sessions
 import mysql.connector
 import time
-import MySQLdb
-from sqlalchemy.types import UnicodeText,Integer,DateTime
+from sqlalchemy.types import UnicodeText, Integer, DateTime
 from sqlalchemy import text
-
 
 username = 'root'
 password = ''
@@ -139,18 +138,28 @@ host = 'localhost'
 port = 3306
 DB_NAME = 'emp_az'
 
-engine = create_engine(f"mysql+mysqldb://{username}:{password}@{host}:{port}/emp_az?charset=utf8mb4")
+# Create SQLAlchemy engine
+engine = create_engine(f"mysql+mysqlconnector://{username}:{password}@{host}:{port}/{DB_NAME}?charset=utf8mb4")
 
+# Connect to the database
 with engine.connect() as conn:
-    result = conn.execute(text("USE emp_az"))
-    conn.execute(text("drop table  IF EXISTS staffy"))
-    vac.to_sql(name='staffy', con=conn,if_exists='append',chunksize = 300,index=False,
-                        dtype = {'job':UnicodeText(),'job_descr':UnicodeText(),'company':UnicodeText(),
-                                'city':UnicodeText(),'job_type':UnicodeText(),'wage':Integer(),
-                                'posted':DateTime(),'deadline':DateTime(),'links':UnicodeText(),'vip':Integer()} )
-    conn.execute(text("ALTER TABLE staffy ADD id INT PRIMARY KEY AUTO_INCREMENT first ;"))
-    conn.close()
-#         time.sleep(120)
+    # Create or use the database
+    result = conn.execute(text(f"USE {DB_NAME}"))
+
+    # Drop existing table if it exists
+    conn.execute(text("DROP TABLE IF EXISTS recruit"))
+
+    # Write DataFrame to MySQL database
+    vac.to_sql(name='recruit', con=conn, if_exists='append', chunksize=300, index=False,
+                           dtype={'job': UnicodeText(), 'job_descr': UnicodeText(), 'company': UnicodeText(),
+                                  'city': UnicodeText(), 'job_type': UnicodeText(), 'wage': Integer(),
+                                  'posted': DateTime(), 'deadline': DateTime(), 'links': UnicodeText(),
+                                  'vip': Integer()})
+
+    # Add primary key column
+    conn.execute(text("ALTER TABLE recruit ADD id INT PRIMARY KEY AUTO_INCREMENT FIRST;"))
+
+# Dispose of the engine
 engine.dispose()
 
 

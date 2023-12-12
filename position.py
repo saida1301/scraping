@@ -13,7 +13,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 import time
-s = Service('C:/Users/turga/chromedriver.exe')
+s = Service('C:/Users/saida/OneDrive/Desktop/Archive/chromedriver-win64/chromedriver.exe')
 driver = webdriver.Chrome(service=s)
 url = 'https://position.az/'
 driver.get(url)
@@ -42,7 +42,8 @@ for position in positions:
 
 for company in companies:
     companies_list.append(company.text)
-
+for salary in salary_list:
+    salary_list.append(salary.text)
 for i in links_list:
     driver.execute_script("window.open('');")
     driver.switch_to.window(driver.window_handles[1])

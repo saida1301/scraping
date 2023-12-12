@@ -64,7 +64,9 @@ for p in pages:
         cities = driver.find_elements(by=By.XPATH, value='/html/body/main/section[3]/div/div[1]/div[9]/div[2]/p[2]')
         for ci in cities:
             city.append(ci.text.split('-')[1])
-
+        wag = driver.find_elements(by=By.XPATH, value='/html/body/main/section[3]/div/div[1]/div[9]/div[1]')
+        for w in wag:
+            wage.append(w.text)
 
 for element in links:
     time.sleep(1)

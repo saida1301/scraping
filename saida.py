@@ -8,10 +8,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup as bs
 import pandas as pd
+import numpy as np
 from sqlalchemy import create_engine, text
 from sqlalchemy.types import UnicodeText, Integer, DateTime
 import datetime
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import WebDriverException
 
 # Configure Chrome options
 chrome_options = webdriver.ChromeOptions()
@@ -36,38 +37,42 @@ links_list = []
 positions_list = []
 companies_list = []
 salary_list = []
+adress_list = []
+jobtype_list = []
 jobdescr_list = []
 deadline_list = []
+posted_list = []
 
 # Iterate over pages
 for page_num in range(1, 11):  # Assuming 10 pages, you can adjust as needed
     try:
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'vacancies__item')))
         soup = bs(driver.page_source, "html.parser")
-    except TimeoutException as e:
-        print(f"TimeoutException: {e}. Skipping page {page_num}.")
+    except WebDriverException as e:
+        print(f"Error: {e}. Skipping page {page_num}.")
         continue
 
     positions = soup.find_all('a', attrs={'class': 'vacancies__item'})
 
     for position in positions:
-        try:
-            # Extract job name and company
-            job_name_element = position.find('div', class_='vacancies__desc').find('h3')
-            company_name_element = position.find('div', class_='vacancies__desc').find('p')
+        # Extract job name
+        job_name = position.find('div', class_='vacancies__desc').find('h3').text
+        positions_list.append(job_name)
 
-            # Check if job_name_element and company_name_element are not None
-            if job_name_element and company_name_element:
-                job_name = job_name_element.text.strip()
-                company_name = company_name_element.text.strip()
-                links_list.append('https://www.hellojob.az' + position['href'])
+        company_name = position.find('div', class_='vacancies__desc').find('p').text
+        companies_list.append(company_name)
+        
+        # Extract vacancy link
+        vacancy_link_element = position.find('a')
+        if vacancy_link_element:
+            vacancy_link = 'https://www.hellojob.az' + vacancy_link_element.get('href')
+            links_list.append(vacancy_link)
 
-                # Visit the vacancy page
-                driver.get(links_list[-1])  # Open the link to get the details
+            # Visit the vacancy page
+            try:
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'resume__block')))
                 vacancy_soup = bs(driver.page_source, "html.parser")
 
-                # Extract job description
                 job_desc_element = vacancy_soup.find('div', class_='resume__block')
                 jobdescr_list.append(job_desc_element.text.strip())
 
@@ -78,30 +83,37 @@ for page_num in range(1, 11):  # Assuming 10 pages, you can adjust as needed
 
                 # Extract deadline information from the vacancy page
                 deadline_element = vacancy_soup.find('div', class_='resume__item__text')
-                deadline_text = deadline_element.text.strip() if deadline_element else None
+                deadline_text = deadline_element.find_all('h4')[0].text.strip() if deadline_element else None
                 deadline_list.append(deadline_text)
 
-        except (TimeoutException, WebDriverException) as e:
-            print(f"Exception: {e}. Skipping vacancy page.")
-        except Exception as e:
-            print(f"Error: {e}. Skipping vacancy page.")
-
+            except WebDriverException as e:
+                print(f"Error: {e}. Skipping vacancy page {vacancy_link}.")
+        else:
+            print("Vacancy link not found. Skipping.")
 # Quit the WebDriver
 driver.quit()
 
 # Create DataFrame
 dataframe_banco = pd.DataFrame({
-    'job': positions_list,
-    'job_descr': jobdescr_list,
-    'company': companies_list,
-    'wage': salary_list,
-    'deadline': deadline_list,
-    'links': links_list,
-    'vip': [0] * len(links_list)
+    'job': pd.Series(positions_list, dtype='object'),
+    'job_descr': pd.Series(jobdescr_list, dtype='object'),
+    'company': pd.Series(companies_list),
+    'city': pd.Series(adress_list),
+    'job_type': pd.Series(jobtype_list),
+    'wage': pd.Series(salary_list),
+    'posted': pd.Series(posted_list),
+    'deadline': pd.Series(deadline_list),
+    'links': pd.Series(links_list),
+    'vip': pd.Series(np.zeros(shape=len(positions_list), dtype=int))
 })
 
 # Convert date columns to datetime format
-dataframe_banco['deadline'] = pd.to_datetime(dataframe_banco['deadline'], errors='coerce')
+dataframe_banco['deadline'] = pd.to_datetime(dataframe_banco['deadline'], format='%d-%m-%Y', errors='coerce')
+dataframe_banco['posted'] = pd.to_datetime(dataframe_banco['posted'], format='%d-%m-%Y', errors='coerce')
+
+# Filter data based on the deadline
+current_date = datetime.datetime.today()
+filtered_data = dataframe_banco[dataframe_banco['deadline'] > current_date]
 
 # Database connection parameters
 username = 'root'
@@ -115,13 +127,17 @@ engine = create_engine(f"mysql+mysqlconnector://{username}:{password}@{host}:{po
 
 # Connect to the database
 with engine.connect() as conn:
+    # Create or use the database
+    result = conn.execute(text(f"USE {DB_NAME}"))
+
     # Drop existing table if it exists
     conn.execute(text("DROP TABLE IF EXISTS hellojob"))
 
     # Write DataFrame to MySQL database
     dataframe_banco.to_sql(name='hellojob', con=conn, if_exists='append', chunksize=300, index=False,
                            dtype={'job': UnicodeText(), 'job_descr': UnicodeText(), 'company': UnicodeText(),
-                                  'wage': UnicodeText(), 'deadline': DateTime(), 'links': UnicodeText(),
+                                  'city': UnicodeText(), 'job_type': UnicodeText(), 'wage': Integer(),
+                                  'posted': DateTime(), 'deadline': DateTime(), 'links': UnicodeText(),
                                   'vip': Integer()})
 
     # Add primary key column

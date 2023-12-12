@@ -53,8 +53,9 @@ for page_num in range(1, 11):  # Assuming 10 pages, you can adjust as needed
     for position in positions:
         try:
             # Extract job name and company
-            job_name_element = position.find('div', class_='vacancies__desc').find('h3')
-            company_name_element = position.find('div', class_='vacancies__desc').find('p')
+            job_desc_element = position.find('div', class_='vacancies__desc')
+            job_name_element = job_desc_element.find('h3') if job_desc_element else None
+            company_name_element = job_desc_element.find('p') if job_desc_element else None
 
             # Check if job_name_element and company_name_element are not None
             if job_name_element and company_name_element:
@@ -68,11 +69,23 @@ for page_num in range(1, 11):  # Assuming 10 pages, you can adjust as needed
                 vacancy_soup = bs(driver.page_source, "html.parser")
 
                 # Extract job description
-                job_desc_element = vacancy_soup.find('div', class_='resume__block')
-                jobdescr_list.append(job_desc_element.text.strip())
+                # Extract job description from the third block
+                job_desc_elements = vacancy_soup.find_all('div', class_='resume__block')
+
+# Check if there is at least one element
+                if job_desc_elements:
+    # Get the text from the third block (index 2)
+                   third_block_text = job_desc_elements[2].text.strip()
+                   jobdescr_list.append(third_block_text)
+                else:
+    # Handle the case where no 'resume__block' elements are found
+                  jobdescr_list.append(None)  # You can replace None with any default value or handle it as needed
+
 
                 # Extract wage information from the vacancy page
-                wage_element = vacancy_soup.find('div', class_='resume__item align-items-center  resume__item__text')
+                salam = vacancy_soup.find('div', class_='resume__item')
+                wage_element=  salam.find_all('div')[1]
+                # wage_element = vacancy_soup.find('div', class_='resume__item__text')
                 wage_text = wage_element.find_all('h4')[0].text.strip() if wage_element else None
                 salary_list.append(wage_text)
 
@@ -80,6 +93,10 @@ for page_num in range(1, 11):  # Assuming 10 pages, you can adjust as needed
                 deadline_element = vacancy_soup.find('div', class_='resume__item__text')
                 deadline_text = deadline_element.text.strip() if deadline_element else None
                 deadline_list.append(deadline_text)
+
+                # Append job name and company to lists
+                positions_list.append(job_name)
+                companies_list.append(company_name)
 
         except (TimeoutException, WebDriverException) as e:
             print(f"Exception: {e}. Skipping vacancy page.")
@@ -92,8 +109,8 @@ driver.quit()
 # Create DataFrame
 dataframe_banco = pd.DataFrame({
     'job': positions_list,
-    'job_descr': jobdescr_list,
     'company': companies_list,
+    'job_descr': jobdescr_list,
     'wage': salary_list,
     'deadline': deadline_list,
     'links': links_list,
@@ -101,7 +118,8 @@ dataframe_banco = pd.DataFrame({
 })
 
 # Convert date columns to datetime format
-dataframe_banco['deadline'] = pd.to_datetime(dataframe_banco['deadline'], errors='coerce')
+dataframe_banco['deadline'] = pd.to_datetime(dataframe_banco['deadline'], format='%d-%m-%Y', errors='coerce')
+
 
 # Database connection parameters
 username = 'root'
@@ -120,7 +138,7 @@ with engine.connect() as conn:
 
     # Write DataFrame to MySQL database
     dataframe_banco.to_sql(name='hellojob', con=conn, if_exists='append', chunksize=300, index=False,
-                           dtype={'job': UnicodeText(), 'job_descr': UnicodeText(), 'company': UnicodeText(),
+                           dtype={'job': UnicodeText(), 'company': UnicodeText(), 'job_descr': UnicodeText(),
                                   'wage': UnicodeText(), 'deadline': DateTime(), 'links': UnicodeText(),
                                   'vip': Integer()})
 

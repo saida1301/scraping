@@ -24,7 +24,7 @@ chrome_options.add_argument("--disable-gpu")
 chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--no-sandbox")
 
-s = Service('C:/Users/turga/chromedriver.exe')
+s = Service('C:/Users/saida/OneDrive/Desktop/Archive/chromedriver-win64/chromedriver.exe')
 driver = webdriver.Chrome(service=s)
 import pandas as pd
 

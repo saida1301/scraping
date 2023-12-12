@@ -55,16 +55,16 @@ for page in pages:
     soup = bs(driver.page_source, "html.parser")
     div = soup.find_all('a', attrs={'class': 'job-listing with-apply-button'})
     for i in div:
-        if i.find_next('div', attrs={'class': 'job-listing-footer'}).find_all('li')[-1].text.split()[0].strip().isdigit():
-            if int(i.find_next('div', attrs={'class': 'job-listing-footer'}).find_all('li')[-1].text.split()[0].strip()) < 30:
+        if i.find_next('div', attrs={'class': 'job-listing-details'}).find_all('li')[-1].text.split()[0].strip().isdigit():
+            if int(i.find_next('div', attrs={'class': 'job-listing-details'}).find_all('li')[-1].text.split()[0].strip()) < 30:
                 company_name.append(
-                    i.find_next('div', attrs={'class': 'job-listing-footer'}).find_all('li')[0].text.strip())
+                    i.find_next('div', attrs={'class': 'job-listing-details'}).find_all('li')[0].text.strip())
                 links.append(i['href'])
                 job.append(i.find_next('h3').text)
 
         else:
             company_name.append(
-                i.find_next('div', attrs={'class': 'job-listing-footer'}).find_all('li')[0].text.strip())
+                i.find_next('div', attrs={'class': 'job-listing-details'}).find_all('li')[0].text.strip())
             links.append(i['href'])
             job.append(i.find_next('h3').text)
 
@@ -122,8 +122,7 @@ host = 'localhost'
 port = 3306
 DB_NAME = 'emp_az'
 
-engine = create_engine(
-    f"mysql+mysqldb://{username}:{password}@{host}:{port}/emp_az?charset=utf8mb4")
+engine = create_engine(f"mysql+mysqlconnector://{username}:{password}@{host}:{port}/{DB_NAME}?charset=utf8mb4")
 
 with engine.connect() as conn:
     result = conn.execute(text("USE emp_az"))
